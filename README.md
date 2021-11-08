@@ -1,4 +1,7 @@
-
+<p align="center">
+  <a href="" rel="noopener">
+ <img width=200px height=200px src="https://cdn-icons-png.flaticon.com/512/1387/1387554.png" alt="File compression logo"></a>
+</p>
 <h3 align="center">PNG, JPEG/JPG and PDF optimizer and (lossless) compressor</h3>
 
 <div align="center">
