@@ -164,7 +164,13 @@ CheckPackage "jpegoptim"
 
 # STEP 4: GET FILE SIZE OF ALL PNG, JPEG AND PDF FILES ACCUMULATED
 TotalPDFSizeInitial=$(find ./ -type f -name '*.pdf' -exec du -cb {} + | grep total | awk '{print $1}')
+if test -z $TotalPDFSizeInitial;then
+    TotalPDFSizeInitial=0
+fi
 TotalPNGSizeInitial=$(find ./ -type f -name '*.png' -exec du -cb {} + | grep total | awk '{print $1}')
+if test -z $TotalPNGSizeInitial;then
+    TotalPNGSizeInitial=0
+fi
 JPG=$(find ./ -type f -name '*.jpg' -exec du -cb {} + | grep total | awk '{print $1}')
 # Test if the variable is empty
 if test -z $JPG;then
@@ -176,6 +182,7 @@ if test -z $JPEG;then
 fi
 
 TotalJPEGSizeInitial=`expr $JPG + $JPEG`
+TotalInitial=`expr $JPG + $JPEG + $TotalPDFSizeInitial + $TotalPNGSizeInitial`
 printf "\nFound $(echo $TotalPDFSizeInitial | bc -l | xargs -0 numfmt --to iec --format "%8.2f" --suffix=B) of PDF files \n"
 printf "Found $(echo $TotalPNGSizeInitial | bc -l | xargs -0 numfmt --to iec --format "%8.2f" --suffix=B) of PNG files \n"
 printf "Found $(echo $TotalJPEGSizeInitial | bc -l | xargs -0 numfmt --to iec --format "%8.2f" --suffix=B) of JPEG/JPG files \n"
@@ -198,12 +205,13 @@ find ./ -type d -print0 | sed 's/$/./' | while IFS= read -r -d '' dir; do
         fi;
         count=`find ./ -maxdepth 1 -name "*.jpg" | wc -l` && \
         if [ "$count" != 0 ]; then
-            (printf "Optimizing and compressing JPEG's in $dir...\n\n") && \
+            (printf "Optimizing and compressing JPEG's/JPG's in $dir...\n\n") && \
             if [[ $VERBOSE == true ]] || [[ $VERY_VERBOSE == true ]]; then
                 (find . -type f \( -iname "*.jpg" -o -iname "*.jpeg" \) -exec jpegoptim -f --preserve --strip-none -t {} \;);
             else
                 (find . -type f \( -iname "*.jpg" -o -iname "*.jpeg" \) -exec jpegoptim -f --preserve --strip-none -t {} \; > /dev/null 2>&1);
             fi;
+            (printf "\n\n\n\n ####################\n\n   JPEG/JPG images in $dir scanned and optimized \n\n ####################\n\n\n\n");
         fi;
         count=`find ./ -maxdepth 1 -name "*.pdf" | wc -l` && \
         if [ "$count" != 0 ]; then
@@ -232,6 +240,9 @@ cd "$CURRENT_DIR"
 
 # PNG
 TotalPNGSizeFinal=$(find ./ -type f -name '*.png' -exec du -cb {} + | grep total | awk '{print $1}')
+if test -z $TotalPNGSizeFinal;then
+    TotalPNGSizeFinal=0
+fi
 PNGReductionPercentage=`echo "(1-($TotalPNGSizeFinal/$TotalPNGSizeInitial))*100" | bc -l | xargs printf "%.2f"`
 
 #JPEG
@@ -250,10 +261,18 @@ JPEGReductionPercentage=`echo "(1-($TotalJPEGSizeFinal/$TotalJPEGSizeInitial))*1
 
 # PDF
 TotalPDFSizeFinal=$(find ./ -type f -name '*.pdf' -exec du -cb {} + | grep total | awk '{print $1}')
+if test -z $TotalPDFSizeFinal;then
+    TotalPDFSizeFinal=0
+fi
 PDFReductionPercentage=`echo "(1-($TotalPDFSizeFinal/$TotalPDFSizeInitial))*100" | bc -l | xargs printf "%.2f"`
+
+TotalFinal=`expr $JPG + $JPEG + $TotalPDFSizeFinal + $TotalPNGSizeFinal`
+TotalReductionPercentage=`echo "(1-($TotalFinal/$TotalInitial))*100" | bc -l | xargs printf "%.2f"`
+
 
 printf "\n\n\n\n ####################\n\n    Finished optimizing PDF,PNG, JPG and JPEG in $CURRENT_DIR and its subdirectories  \n\n ####################\n\n\n\n"
 printf "Total size reduction for PNG: $(echo $TotalPNGSizeInitial | bc -l | xargs -0 numfmt --to iec --format "%8.2f" --suffix=B) to $(echo $TotalPNGSizeFinal |  bc -l | xargs -0 numfmt --to iec --format "%8.2f" --suffix=B) ($PNGReductionPercentage%% reduction)\n"
 printf "Total size reduction for JPEG: $(echo $TotalJPEGSizeInitial |  bc -l | xargs -0 numfmt --to iec --format "%8.2f" --suffix=B) to $(echo $TotalJPEGSizeFinal |  bc -l | xargs -0 numfmt --to iec --format "%8.2f" --suffix=B) ($JPEGReductionPercentage%% reduction) \n"
 printf "Total size reduction for PDF: $(echo $TotalPDFSizeInitial |  bc -l | xargs -0 numfmt --to iec --format "%8.2f" --suffix=B) to $(echo $TotalPDFSizeFinal |  bc -l | xargs -0 numfmt --to iec --format "%8.2f" --suffix=B) ($PDFReductionPercentage%% reduction) \n"
+printf "Total size reduction for PNG,JPG/JPEG and PDF collectively: $(echo $TotalInitial |  bc -l | xargs -0 numfmt --to iec --format "%8.2f" --suffix=B) to $(echo $TotalFinal |  bc -l | xargs -0 numfmt --to iec --format "%8.2f" --suffix=B) ($TotalReductionPercentage%% reduction) \n"
 
