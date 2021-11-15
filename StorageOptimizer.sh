@@ -17,7 +17,7 @@ function usage() {
     Options:
         -v, --verbose:          Print info regarding optimization and compression of files (PNG and JPEG/JPG)
         -x, --extra-verbose:    Print all info regarding optimization and compression of files (PNG, JPEG/JPG and PDF)  
-        -e, --exlude-dir:       Exclude a directory (and all it's subdirectories) from being optimized
+        -e, --exlude-dir:       Exclude a directory (and all it's subdirectories) from being optimized (NOTE: Must prefix the folder name with ./)
         -h, --help              Print this help message
 USAGE
     exit 1
@@ -209,11 +209,15 @@ printf "Found $(echo $TotalJPEGSizeInitial | bc -l | xargs -0 numfmt --to iec --
 # For pfd files firstly run through pdfsizeopt and nextly through old version of Multivalent java class (Downloaded from: https://web.archive.org/web/20150919020215/http://www.vrspace.org/sdk/java/multivalent/Multivalent20060102.jar)
 printf "\n\n /////////////////////STARTING OPTIMIZATION///////////////////// \n\n"
 cd "$CURRENT_DIR"
+i=0
 regex="$IGNORE_DIR/*"
 find ./ -type d -print0 | sed 's/$/./' | while IFS= read -r -d '' dir; do
         if [[ -n $IGNORE_DIR ]]; then
             if [[ ${dir} == $regex ]]; then
-                (printf "\n\nEXCLUDING $dir from optimization...\n\n")
+                if [[ $i == 0 ]]; then
+                    (printf "\n\nEXCLUDING $IGNORE_DIR from optimization...\n\n")
+                    i=1
+                fi;
                 continue;
             fi;
         fi;
