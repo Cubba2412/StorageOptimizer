@@ -24,35 +24,38 @@ USAGE
 }
 
 ##argument_script.sh
-vars=$(getopt -o vxe:h --long verbose,extra-verbose,exclude-dir:,help -- "$@")
-eval set -- "$vars"
 VERBOSE=false
 EXTRA_VERBOSE=false
 IGNORE_DIR=''
 
-for arg in "$@"; do
-    case $arg in
-    --verbose | -v)
-        VERBOSE=true
-        shift 2
-        ;;
-    --extra-verbose | -vv)
-        EXTRA_VERBOSE=true
-        shift 2
-        ;;
-    --exclude-dir | -ed)
-        IGNORE_DIR=$2
-        shift 2
-        ;;
-    --help | -h)
-        usage # run usage function on help
-        shift 2
-        ;;
-     \?) # Invalid option
-         echo "Error: Invalid option"
-         exit;;
-    *)
+options=$(getopt -o vxe:h -l verbose,extra-verbose,exclude-dir:,help -n "$0" -- "$@") || exit
+eval set -- "$options"
+
+while [[ $1 != -- ]]; do
+    case $1 in
+        --verbose | -v)
+            VERBOSE=true;
+            shift 1 # Shift to next argument given
+            ;;
+        --extra-verbose | -x)
+            EXTRA_VERBOSE=true;
+            shift 1
+            ;;
+        --exclude-dir | -e)
+            IGNORE_DIR=$2
+            shift 2 # Both argument and input dir is given so we shift by 2 arguments here
+            ;;
+        --help | -h)
+            usage # run usage function on help
+            shift 1
+            ;;
+            *) echo "Error: Invalid option $1" >&2; exit 1;;
     esac
+done
+shift
+# Process non-option arguments.
+for arg; do
+    echo "arg! $arg"
 done
 CURRENT_DIR=$(pwd)
 # AddMultivalentToBin () {
@@ -209,15 +212,11 @@ printf "Found $(echo $TotalJPEGSizeInitial | bc -l | xargs -0 numfmt --to iec --
 # For pfd files firstly run through pdfsizeopt and nextly through old version of Multivalent java class (Downloaded from: https://web.archive.org/web/20150919020215/http://www.vrspace.org/sdk/java/multivalent/Multivalent20060102.jar)
 printf "\n\n /////////////////////STARTING OPTIMIZATION///////////////////// \n\n"
 cd "$CURRENT_DIR"
-i=0
 regex="$IGNORE_DIR/*"
 find ./ -type d -print0 | sed 's/$/./' | while IFS= read -r -d '' dir; do
         if [[ -n $IGNORE_DIR ]]; then
             if [[ ${dir} == $regex ]]; then
-                if [[ $i == 0 ]]; then
-                    (printf "\n\nEXCLUDING $IGNORE_DIR from optimization...\n\n")
-                    i=1
-                fi;
+                (printf "\n\nEXCLUDING $dir from optimization...\n\n")
                 continue;
             fi;
         fi;
