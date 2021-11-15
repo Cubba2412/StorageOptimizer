@@ -16,23 +16,41 @@ function usage() {
 
     Options:
         -v, --verbose:          Print info regarding optimization and compression of files (PNG and JPEG/JPG)
-        -vv, --ver-verbose:     Print all info regarding optimization and compression of files (PNG, JPEG/JPG and PDF)  
+        -x, --extra-verbose:    Print all info regarding optimization and compression of files (PNG, JPEG/JPG and PDF)  
+        -e, --exlude-dir:       Exclude a directory (and all it's subdirectories) from being optimized
+        -h, --help              Print this help message
 USAGE
     exit 1
 }
+
+##argument_script.sh
+vars=$(getopt -o vxe:h --long verbose,extra-verbose,exclude-dir:,help -- "$@")
+eval set -- "$vars"
+VERBOSE=false
+EXTRA_VERBOSE=false
+IGNORE_DIR=''
 
 for arg in "$@"; do
     case $arg in
     --verbose | -v)
         VERBOSE=true
-        shift # Remove --verbose from `$@`
+        shift 2
         ;;
-    --very-verbose | -vv)
-        VERY_VERBOSE=true
+    --extra-verbose | -vv)
+        EXTRA_VERBOSE=true
+        shift 2
+        ;;
+    --exclude-dir | -ed)
+        IGNORE_DIR=$2
+        shift 2
         ;;
     --help | -h)
         usage # run usage function on help
+        shift 2
         ;;
+     \?) # Invalid option
+         echo "Error: Invalid option"
+         exit;;
     *)
     esac
 done
@@ -91,7 +109,7 @@ AddPdfsizeoptToBin () {
     tar xzvf pdfsizeopt_libexec_extraimgopt_linux-v3.tar.gz
     rm -f    pdfsizeopt_libexec_extraimgopt_linux-v3.tar.gz
     ln -s pdfsizeopt.single pdfsizeopt
-    cd $CURRENT_DIR
+    cd "$CURRENT_DIR"
 }
 
 CheckPackage () {
@@ -163,20 +181,20 @@ CheckPackage "optipng"
 CheckPackage "jpegoptim"
 
 # STEP 4: GET FILE SIZE OF ALL PNG, JPEG AND PDF FILES ACCUMULATED
-TotalPDFSizeInitial=$(find ./ -type f -name '*.pdf' -exec du -cb {} + | grep total | awk '{print $1}')
+TotalPDFSizeInitial=$(find ./ -type f -name '*.pdf' -exec du -cb {} + | grep total | tail -n 1 | awk '{print $1}')
 if test -z $TotalPDFSizeInitial;then
     TotalPDFSizeInitial=0
 fi
-TotalPNGSizeInitial=$(find ./ -type f -name '*.png' -exec du -cb {} + | grep total | awk '{print $1}')
+TotalPNGSizeInitial=$(find ./ -type f -name '*.png' -exec du -cb {} + | grep total | tail -n 1 | awk '{print $1}')
 if test -z $TotalPNGSizeInitial;then
     TotalPNGSizeInitial=0
 fi
-JPG=$(find ./ -type f -name '*.jpg' -exec du -cb {} + | grep total | awk '{print $1}')
+JPG=$(find ./ -type f -name '*.jpg' -exec du -cb {} + | grep total | tail -n 1 | awk '{print $1}')
 # Test if the variable is empty
 if test -z $JPG;then
     JPG=0
 fi
-JPEG=$(find ./ -type f -name '*.jpeg' -exec du -cb {} + | grep total | awk '{print $1}')
+JPEG=$(find ./ -type f -name '*.jpeg' -exec du -cb {} + | grep total | tail -n 1 | awk '{print $1}')
 if test -z $JPEG;then
     JPEG=0
 fi
@@ -191,12 +209,19 @@ printf "Found $(echo $TotalJPEGSizeInitial | bc -l | xargs -0 numfmt --to iec --
 # For pfd files firstly run through pdfsizeopt and nextly through old version of Multivalent java class (Downloaded from: https://web.archive.org/web/20150919020215/http://www.vrspace.org/sdk/java/multivalent/Multivalent20060102.jar)
 printf "\n\n /////////////////////STARTING OPTIMIZATION///////////////////// \n\n"
 cd "$CURRENT_DIR"
+regex="$IGNORE_DIR/*"
 find ./ -type d -print0 | sed 's/$/./' | while IFS= read -r -d '' dir; do
-        (cd "$dir" && \
+        if [[ -n $IGNORE_DIR ]]; then
+            if [[ ${dir} == $regex ]]; then
+                (printf "\n\nEXCLUDING $dir from optimization...\n\n")
+                continue;
+            fi;
+        fi;
+        cd "$dir" && \
         count=`find ./ -maxdepth 1 -name "*.png" | wc -l` && \
         if [ "$count" != 0 ]; then
             (printf "\n\nOptimizing and compressing PNG's in $dir...\n\n") && \
-            if [[ $VERBOSE == true ]] || [[ $VERY_VERBOSE == true ]]; then
+            if [[ $VERBOSE == true ]] || [[ $EXTRA_VERBOSE == true ]]; then
                 (find . -iname '*.png' -print0 | xargs --no-run-if-empty -0 optipng -o7 -preserve)
             else
                 (find . -iname '*.png' -print0 | xargs --no-run-if-empty -0 optipng -o7 -preserve > /dev/null 2>&1)
@@ -206,7 +231,7 @@ find ./ -type d -print0 | sed 's/$/./' | while IFS= read -r -d '' dir; do
         count=`find ./ -maxdepth 1 -name "*.jpg" | wc -l` && \
         if [ "$count" != 0 ]; then
             (printf "Optimizing and compressing JPEG's/JPG's in $dir...\n\n") && \
-            if [[ $VERBOSE == true ]] || [[ $VERY_VERBOSE == true ]]; then
+            if [[ $VERBOSE == true ]] || [[ $EXTRA_VERBOSE == true ]]; then
                 (find . -type f \( -iname "*.jpg" -o -iname "*.jpeg" \) -exec jpegoptim -f --preserve --strip-none -t {} \;);
             else
                 (find . -type f \( -iname "*.jpg" -o -iname "*.jpeg" \) -exec jpegoptim -f --preserve --strip-none -t {} \; > /dev/null 2>&1);
@@ -220,7 +245,7 @@ find ./ -type d -print0 | sed 's/$/./' | while IFS= read -r -d '' dir; do
                 # If the directory is empty, the pdfFile variable will contain "./*.pdf" which doesn't exist. The if statement is there to counter this.
                 if [ "$pdfFile" != './*.pdf' ]; then 
                 (printf "\n Optimizing $pdfFile with pdfsizeopt...\n" && \
-                    if [[ $VERY_VERBOSE == true ]]; then
+                    if [[ $EXTRA_VERBOSE == true ]]; then
                         pdfsizeopt "$pdfFile" "$pdfFile"
                     else
                         pdfsizeopt "$pdfFile" "$pdfFile" > /dev/null 2>&1
@@ -230,24 +255,28 @@ find ./ -type d -print0 | sed 's/$/./' | while IFS= read -r -d '' dir; do
             done;
             (printf "\n\n\n\n ####################\n\n    PDF's in $dir scanned and optimmized. \n\n ####################\n\n\n\n ")
         fi;
-        )
+        cd "$CURRENT_DIR"
     done;
-cd "$CURRENT_DIR"
+#cd "$CURRENT_DIR"
 # Remove Multivalent from folder
 # for d in ./*/; do
 #     (cd "$d" && (find . -name "Multivalent20060102.jar" -type f -delete))
 # done
 
 # PNG
-TotalPNGSizeFinal=$(find ./ -type f -name '*.png' -exec du -cb {} + | grep total | awk '{print $1}')
+TotalPNGSizeFinal=$(find ./ -type f -name '*.png' -exec du -cb {} + | grep total | tail -n 1 | awk '{print $1}')
 if test -z $TotalPNGSizeFinal;then
     TotalPNGSizeFinal=0
 fi
-PNGReductionPercentage=`echo "(1-($TotalPNGSizeFinal/$TotalPNGSizeInitial))*100" | bc -l | xargs printf "%.2f"`
+if [[ $TotalPNGSizeInital == 0 ]]; then
+    PNGReductionPercentage=0
+else
+    PNGReductionPercentage=`echo "(1-($TotalPNGSizeFinal/$TotalPNGSizeInitial))*100" | bc -l | xargs printf "%.2f"`
+fi;
 
 #JPEG
-JPG=$(find ./ -type f -name '*.jpg' -exec du -cb {} + | grep total | awk '{print $1}')
-JPEG=$(find ./ -type f -name '*.jpeg' -exec du -cb {} + | grep total | awk '{print $1}')
+JPG=$(find ./ -type f -name '*.jpg' -exec du -cb {} + | grep total | tail -n 1 | awk '{print $1}')
+JPEG=$(find ./ -type f -name '*.jpeg' -exec du -cb {} + | grep total | tail -n 1 | awk '{print $1}')
 # Test if the variable is empty
 if test -z $JPG;then
     JPG=0
@@ -257,17 +286,28 @@ if test -z $JPEG;then
 fi
 
 TotalJPEGSizeFinal=`expr $JPG + $JPEG`
-JPEGReductionPercentage=`echo "(1-($TotalJPEGSizeFinal/$TotalJPEGSizeInitial))*100" | bc -l | xargs printf "%.2f"`
-
+if [[ $TotalJPEGSizeInitial == 0 ]]; then
+    JPEGReductionPercentage=0
+else
+    JPEGReductionPercentage=`echo "(1-($TotalJPEGSizeFinal/$TotalJPEGSizeInitial))*100" | bc -l | xargs printf "%.2f"`
+fi;
 # PDF
-TotalPDFSizeFinal=$(find ./ -type f -name '*.pdf' -exec du -cb {} + | grep total | awk '{print $1}')
+TotalPDFSizeFinal=$(find ./ -type f -name '*.pdf' -exec du -cb {} + | grep total | tail -n 1 | awk '{print $1}')
 if test -z $TotalPDFSizeFinal;then
     TotalPDFSizeFinal=0
 fi
-PDFReductionPercentage=`echo "(1-($TotalPDFSizeFinal/$TotalPDFSizeInitial))*100" | bc -l | xargs printf "%.2f"`
+if [[ $TotalPDFSizeInital == 0 ]]; then
+    PDFReductionPercentage=0
+else
+    PDFReductionPercentage=`echo "(1-($TotalPDFSizeFinal/$TotalPDFSizeInitial))*100" | bc -l | xargs printf "%.2f"`
+fi;
 
 TotalFinal=`expr $JPG + $JPEG + $TotalPDFSizeFinal + $TotalPNGSizeFinal`
-TotalReductionPercentage=`echo "(1-($TotalFinal/$TotalInitial))*100" | bc -l | xargs printf "%.2f"`
+if [[ $TotalInitial == 0 ]]; then
+    TotalReductionPercentage=0
+else
+    TotalReductionPercentage=`echo "(1-($TotalFinal/$TotalInitial))*100" | bc -l | xargs printf "%.2f"`
+fi;
 
 
 printf "\n\n\n\n ####################\n\n    Finished optimizing PDF,PNG, JPG and JPEG in $CURRENT_DIR and its subdirectories  \n\n ####################\n\n\n\n"
