@@ -17,7 +17,7 @@ function usage() {
     Options:
         -v, --verbose:          Print info regarding optimization and compression of files (PNG and JPEG/JPG)
         -x, --extra-verbose:    Print all info regarding optimization and compression of files (PNG, JPEG/JPG and PDF)  
-        -e, --exlude-dir:       Exclude a directory (and all it's subdirectories) from being optimized (NOTE: Must prefix the folder name with ./)
+        -e, --exlude-dir:       Exclude a (single) directory (and all it's subdirectories) from being optimized (NOTE: Must prefix the folder name with ./)
         -h, --help              Print this help message
 USAGE
     exit 1
